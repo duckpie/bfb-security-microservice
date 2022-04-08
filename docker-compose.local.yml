@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  security_ms:
+    build:
+      dockerfile: Dockerfile
+      context: .
+    command: run
+    environment:
+      - ENV=local
+    restart: unless-stopped
+
+networks:
+  default:
+    name: wrsnet
