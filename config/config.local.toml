@@ -1,0 +1,17 @@
+[services]
+
+[services.server]
+PORT = 50055
+ACCESS_SECRET = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+REFRESH_SECRET = "JzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ikpva"
+
+[services.redis]
+HOST = "security_redis"
+PORT = 6379
+DB = 1
+
+[microservices]
+
+[microservices.user]
+HOST="user_ms_service"
+PORT = 50051

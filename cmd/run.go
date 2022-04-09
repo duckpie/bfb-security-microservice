@@ -1,18 +1,20 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/BurntSushi/toml"
 	"github.com/duckpie/bfb-security-microservice/internal/config"
+	"github.com/duckpie/bfb-security-microservice/internal/server"
+	"github.com/oklog/oklog/pkg/group"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
+	pb "github.com/wrs-news/golang-proto/pkg/proto/security"
 )
 
 func runCmd() *cobra.Command {
@@ -23,8 +25,9 @@ func runCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := config.NewConfig()
 
+			// os.Getenv("ENV")
 			if _, err := toml.DecodeFile(
-				fmt.Sprintf("config/config.%s.toml", os.Getenv("ENV")), cfg); err != nil {
+				fmt.Sprintf("config/config.%s.toml", "local"), cfg); err != nil {
 				log.Printf(err.Error())
 				os.Exit(1)
 			}
@@ -53,20 +56,45 @@ func runner(cfg *config.Config) (err error) {
 		}
 	}()
 
-	// Создание контекста
-	ctx := context.Background()
-	errs, ctx := errgroup.WithContext(ctx)
-
-	cancelInterrupt := make(chan struct{})
-
-	fmt.Println(os.Getenv("ENV"))
-
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	select {
-	case sig := <-c:
-		return fmt.Errorf("received signal %s", sig)
-	case <-cancelInterrupt:
-		return errs.Wait()
+	srv := server.InitServer(&cfg.Services.Server)
+	if err := srv.ConnectToUserService(
+		cfg.Microservices.UserMs.Host,
+		int(cfg.Microservices.UserMs.Port),
+	); err != nil {
+		return err
 	}
+
+	var g group.Group
+	{
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.Services.Server.Port))
+		if err != nil {
+			return err
+		}
+		log.Printf("server listening a t %v", lis.Addr())
+
+		g.Add(func() error {
+			pb.RegisterSecurityServiceServer(srv.GetServer(), srv)
+			return srv.GetServer().Serve(lis)
+		}, func(error) {
+			lis.Close()
+		})
+	}
+
+	{
+		cancelInterrupt := make(chan struct{})
+		g.Add(func() error {
+			c := make(chan os.Signal, 1)
+			signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+			select {
+			case sig := <-c:
+				return fmt.Errorf("received signal %s", sig)
+			case <-cancelInterrupt:
+				return nil
+			}
+		}, func(error) {
+			close(cancelInterrupt)
+		})
+	}
+
+	return g.Run()
 }
