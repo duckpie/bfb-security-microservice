@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/duckpie/bfb-security-microservice/internal/config"
+	"github.com/duckpie/bfb-security-microservice/internal/db/redisstore"
 	"github.com/duckpie/bfb-security-microservice/internal/server"
 	"github.com/oklog/oklog/pkg/group"
 	"github.com/spf13/cobra"
@@ -56,7 +58,14 @@ func runner(cfg *config.Config) (err error) {
 		}
 	}()
 
-	srv := server.InitServer(&cfg.Services.Server)
+	ctx := context.Background()
+
+	r, err := redisstore.NewClient(ctx, &cfg.Services.Redis)
+	if err != nil {
+		return err
+	}
+
+	srv := server.InitServer(&cfg.Services.Server, redisstore.NewRedisStore(r))
 	if err := srv.ConnectToUserService(
 		cfg.Microservices.UserMs.Host,
 		int(cfg.Microservices.UserMs.Port),

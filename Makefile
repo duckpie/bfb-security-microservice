@@ -1,4 +1,5 @@
 ENV=local
+PROTOV=0.3.2
 
 .PHONY: run
 run:
@@ -17,10 +18,9 @@ test:
 	sudo docker-compose -f docker-compose.test.yml up --remove-orphans
 
 
-.PHONY: gen
-gen:
-	go get -d github.com/99designs/gqlgen
-	go run github.com/99designs/gqlgen generate
+.PHONY: protoup
+protoup:
+	go get -u github.com/wrs-news/golang-proto@v$(PROTOV)
 
 
 .PHONY: count

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/duckpie/bfb-security-microservice/internal/model"
@@ -59,4 +61,68 @@ func (s *Server) createToken(u *pbu.User) (*model.TokenDetails, error) {
 	}
 
 	return td, nil
+}
+
+func (s *Server) createAuth(ctx context.Context, td *model.TokenDetails) error {
+	// Конвертация access_token из Unix формата в UTC
+	at := time.Unix(td.AtExpires, 0)
+	// Конвертация refresh_token из Unix формата в UTC
+	rt := time.Unix(td.RtExpires, 0)
+
+	now := time.Now()
+
+	// Сохранение access_tokenа
+	if errAccess := s.redis.Save(ctx, td.AccessUuid, td.AccessToken, at.Sub(now)); errAccess != nil {
+		return errAccess
+	}
+
+	// Сохранение refresh_tokenа
+	if errRefresh := s.redis.Save(ctx, td.RefreshUuid, td.RefreshToken, rt.Sub(now)); errRefresh != nil {
+		return errRefresh
+	}
+
+	return nil
+}
+
+// Верификация JWT токена
+func (s *Server) verifyToken(tokenStr string) (*jwt.Token, error) {
+	// Извлекаю токен в виде структуры
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		// Проверяю соответствие подписи токена с методом SigningMethodHMAC
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		return []byte(s.cfg.AccessSecret), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
+}
+
+// Извлечение мета-данных из токена
+func (s *Server) extractTokenMetadata(tokenStr string) (*model.AccessDetails, error) {
+	token, err := s.verifyToken(tokenStr)
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if ok && token.Valid {
+		accessUuid, ok := claims["access_uuid"].(string)
+		if !ok {
+			return nil, err
+		}
+
+		return &model.AccessDetails{
+			AccessUuid: accessUuid,
+			Uuid:       claims["uuid"].(string),
+			Login:      claims["login"].(string),
+			Role:       int(claims["role"].(float64)),
+		}, nil
+	}
+
+	return nil, err
 }

@@ -12,8 +12,8 @@ type TokenDetails struct {
 
 // Структура метаданных молезной нагрузки Access Token
 type AccessDetails struct {
+	Uuid       string
 	AccessUuid string
-	ChatID     int64
-	Username   string
+	Login      string
 	Role       int
 }

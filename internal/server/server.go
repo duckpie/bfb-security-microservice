@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/duckpie/bfb-security-microservice/internal/config"
+	"github.com/duckpie/bfb-security-microservice/internal/db/redisstore"
 	pb "github.com/wrs-news/golang-proto/pkg/proto/security"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -14,6 +15,7 @@ type Server struct {
 	pb.UnimplementedSecurityServiceServer
 
 	server   *grpc.Server
+	redis    redisstore.RedisStoreI
 	userConn *grpc.ClientConn
 
 	cfg *config.ServerConfig
@@ -45,9 +47,10 @@ func (s *Server) HeartbeatCheck(ctx context.Context, e *emptypb.Empty) (*emptypb
 	return &emptypb.Empty{}, nil
 }
 
-func InitServer(cfg *config.ServerConfig) *Server {
+func InitServer(cfg *config.ServerConfig, r redisstore.RedisStoreI) *Server {
 	return &Server{
 		server: grpc.NewServer(),
 		cfg:    cfg,
+		redis:  r,
 	}
 }
