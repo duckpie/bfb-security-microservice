@@ -4,9 +4,9 @@ go 1.18
 
 require (
 	github.com/spf13/cobra v1.4.0
-	github.com/wrs-news/golang-proto v0.3.4
+	github.com/wrs-news/golang-proto v0.3.5
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/protobuf v1.28.0
 )
 
 require (

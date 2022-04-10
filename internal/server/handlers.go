@@ -93,7 +93,7 @@ func (s *Server) RefreshToken(ctx context.Context, in *pb.RefreshTokenReq) (*pb.
 			return nil, err
 		}
 
-		// Сохранение метаданных токенов в redis
+		// Сохранение токенов в redis
 		if err := s.createAuth(ctx, td); err != nil {
 			return nil, err
 		}
@@ -107,6 +107,11 @@ func (s *Server) RefreshToken(ctx context.Context, in *pb.RefreshTokenReq) (*pb.
 	return nil, errors.New("refresh expired")
 }
 
-func (s *Server) Logout(ctx context.Context, in *emptypb.Empty) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
+func (s *Server) Logout(ctx context.Context, in *pb.LogoutReq) (*emptypb.Empty, error) {
+	tokenDt, err := s.extractTokenMetadata(in.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	return &emptypb.Empty{}, s.redis.Delete(ctx, tokenDt.AccessUuid)
 }
