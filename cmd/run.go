@@ -12,11 +12,13 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/duckpie/bfb-security-microservice/internal/config"
+	"github.com/duckpie/bfb-security-microservice/internal/core"
 	"github.com/duckpie/bfb-security-microservice/internal/db/redisstore"
 	"github.com/duckpie/bfb-security-microservice/internal/server"
 	"github.com/oklog/oklog/pkg/group"
 	"github.com/spf13/cobra"
 	pb "github.com/wrs-news/golang-proto/pkg/proto/security"
+	"google.golang.org/grpc"
 )
 
 func runCmd() *cobra.Command {
@@ -27,9 +29,8 @@ func runCmd() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg := config.NewConfig()
 
-			// os.Getenv("ENV")
 			if _, err := toml.DecodeFile(
-				fmt.Sprintf("config/config.%s.toml", "local"), cfg); err != nil {
+				fmt.Sprintf("config/config.%s.toml", os.Getenv("ENV")), cfg); err != nil {
 				log.Printf(err.Error())
 				os.Exit(1)
 			}
@@ -66,10 +67,13 @@ func runner(cfg *config.Config) (err error) {
 	}
 
 	srv := server.InitServer(&cfg.Services.Server, redisstore.NewRedisStore(r))
-	if err := srv.ConnectToUserService(
-		cfg.Microservices.UserMs.Host,
-		int(cfg.Microservices.UserMs.Port),
-	); err != nil {
+
+	if err := srv.AddConnection(core.UMS, func() (*grpc.ClientConn, error) {
+		return grpc.Dial(
+			fmt.Sprintf("%s:%d", cfg.Microservices.UserMs.Host, cfg.Microservices.UserMs.Port),
+			grpc.WithInsecure(),
+		)
+	}); err != nil {
 		return err
 	}
 

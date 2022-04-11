@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/duckpie/bfb-security-microservice/internal/core"
 	"github.com/golang-jwt/jwt"
 	pb "github.com/wrs-news/golang-proto/pkg/proto/security"
 	pbu "github.com/wrs-news/golang-proto/pkg/proto/user"
@@ -13,7 +14,12 @@ import (
 )
 
 func (s *Server) Login(ctx context.Context, in *pb.LoginReq) (*pb.TokensPair, error) {
-	conn := pbu.NewUserServiceClient(s.userConn)
+	client, err := s.GetConn(core.UMS)
+	if err != nil {
+		return nil, err
+	}
+
+	conn := pbu.NewUserServiceClient(client)
 
 	resp, err := conn.GetUserByLogin(ctx, &pbu.UserReqLogin{
 		Login: in.Login,
