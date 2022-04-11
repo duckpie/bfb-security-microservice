@@ -15,7 +15,10 @@ build:
 .PHONY: test
 test:
 	sudo docker-compose -f docker-compose.test.yml build
-	sudo docker-compose -f docker-compose.test.yml up --remove-orphans
+	sudo docker-compose -f docker-compose.test.yml up \
+		--remove-orphans \
+		--abort-on-container-exit \
+		--exit-code-from security_ms_test
 
 
 .PHONY: protoup
