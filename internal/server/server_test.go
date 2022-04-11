@@ -23,7 +23,9 @@ var (
 	testConfig = config.NewConfig()
 	bufSize    = 1024 * 1024
 	lis        *bufconn.Listener
-	testUser   *pbu.User
+
+	srv      *server.Server
+	teardown func(ctx context.Context) error
 )
 
 func TestMain(m *testing.M) {
@@ -39,7 +41,11 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
-	defer r.Close()
+
+	teardown = func(ctx context.Context) error {
+		r.FlushAll(ctx)
+		return r.Close()
+	}
 
 	lis = bufconn.Listen(bufSize)
 	srv := server.InitServer(&testConfig.Services.Server, redisstore.NewRedisStore(r))
@@ -62,7 +68,7 @@ func TestMain(m *testing.M) {
 	defer client.Close()
 
 	conn := pbu.NewUserServiceClient(client)
-	testUser, err = conn.CreateUser(ctx, &pbu.NewUserReq{
+	testUser, err := conn.CreateUser(ctx, &pbu.NewUserReq{
 		Login:    "tester",
 		Email:    "tester@gmail.com",
 		Password: "12344321",
