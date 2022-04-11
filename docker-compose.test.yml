@@ -1,19 +1,15 @@
 version: "3.9"
 services:
-  security_ms:
+  security_ms_test:
     build:
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.test
       context: .
-    command: run
-    environment:
-      - ENV=local
-    ports:
-      - "50055:50055"
     depends_on:
-      - security_redis
-    restart: unless-stopped
+      - security_redis_test
+    environment:
+      - ENV=test
 
-  security_redis:
+  security_redis_test:
     image: redis:6-alpine
     ports:
       - '127.0.0.1:35006:6379'
