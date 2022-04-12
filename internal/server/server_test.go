@@ -10,9 +10,9 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/duckpie/bfb-security-microservice/internal/config"
-	"github.com/duckpie/bfb-security-microservice/internal/core"
 	"github.com/duckpie/bfb-security-microservice/internal/db/redisstore"
 	"github.com/duckpie/bfb-security-microservice/internal/server"
+	"github.com/duckpie/cherry"
 	pb "github.com/wrs-news/golang-proto/pkg/proto/security"
 	pbu "github.com/wrs-news/golang-proto/pkg/proto/user"
 	"google.golang.org/grpc"
@@ -51,7 +51,7 @@ func TestMain(m *testing.M) {
 	srv := server.InitServer(&testConfig.Services.Server, redisstore.NewRedisStore(r))
 	defer srv.GetServer().Stop()
 
-	if err := srv.AddConnection(core.UMS, func() (*grpc.ClientConn, error) {
+	if err := srv.AddConnection(cherry.UMS, func() (*grpc.ClientConn, error) {
 		return grpc.Dial(
 			fmt.Sprintf("%s:%d", testConfig.Microservices.UserMs.Host, testConfig.Microservices.UserMs.Port),
 			grpc.WithInsecure(),
@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Создание пользователя
-	client, err := srv.GetConn(core.UMS)
+	client, err := srv.GetConn(cherry.UMS)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}

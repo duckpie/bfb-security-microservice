@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/duckpie/bfb-security-microservice/internal/core"
+	"github.com/duckpie/cherry"
+	cherrynet "github.com/duckpie/cherry/net"
 	"github.com/golang-jwt/jwt"
 	pb "github.com/wrs-news/golang-proto/pkg/proto/security"
 	pbu "github.com/wrs-news/golang-proto/pkg/proto/user"
@@ -14,25 +16,33 @@ import (
 )
 
 func (s *Server) Login(ctx context.Context, in *pb.LoginReq) (*pb.TokensPair, error) {
-	client, err := s.GetConn(core.UMS)
+	client, err := s.GetConn(cherry.UMS)
 	if err != nil {
 		return nil, err
 	}
 
 	conn := pbu.NewUserServiceClient(client)
+	rptr := cherrynet.GrpcRepeater(func(ctx context.Context) (interface{}, error) {
+		resp, err := conn.GetUserByLogin(ctx, &pbu.UserReqLogin{
+			Login: in.Login,
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	resp, err := conn.GetUserByLogin(ctx, &pbu.UserReqLogin{
-		Login: in.Login,
-	})
+		return resp, nil
+	}, 3, time.Second)
+
+	resp, err := rptr(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(resp.Hash), []byte(in.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(resp.(*pbu.User).Hash), []byte(in.Password)); err != nil {
 		return nil, err
 	}
 
-	td, err := s.createToken(resp)
+	td, err := s.createToken(resp.(*pbu.User))
 	if err != nil {
 		return nil, err
 	}

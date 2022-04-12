@@ -3,6 +3,7 @@ module github.com/duckpie/bfb-security-microservice
 go 1.18
 
 require (
+	github.com/duckpie/cherry v0.0.0-20220411202740-c286ab674c25
 	github.com/spf13/cobra v1.4.0
 	github.com/wrs-news/golang-proto v0.3.5
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
