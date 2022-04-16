@@ -12,13 +12,16 @@ import (
 	pb "github.com/wrs-news/golang-proto/pkg/proto/security"
 	pbu "github.com/wrs-news/golang-proto/pkg/proto/user"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (s *Server) Login(ctx context.Context, in *pb.LoginReq) (*pb.TokensPair, error) {
 	client, err := s.GetConn(cherry.UMS)
 	if err != nil {
-		return nil, err
+		es := status.New(codes.Internal, err.Error())
+		return nil, es.Err()
 	}
 
 	conn := pbu.NewUserServiceClient(client)
@@ -39,16 +42,19 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginReq) (*pb.TokensPair, er
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(resp.(*pbu.User).Hash), []byte(in.Password)); err != nil {
-		return nil, err
+		es := status.New(codes.Internal, err.Error())
+		return nil, es.Err()
 	}
 
 	td, err := s.createToken(resp.(*pbu.User))
 	if err != nil {
-		return nil, err
+		es := status.New(codes.Internal, err.Error())
+		return nil, es.Err()
 	}
 
 	if err := s.createAuth(ctx, td); err != nil {
-		return nil, err
+		es := status.New(codes.Internal, err.Error())
+		return nil, es.Err()
 	}
 
 	return &pb.TokensPair{
@@ -60,11 +66,13 @@ func (s *Server) Login(ctx context.Context, in *pb.LoginReq) (*pb.TokensPair, er
 func (s *Server) AuthCheck(ctx context.Context, in *pb.AuthCheckReq) (*emptypb.Empty, error) {
 	tokenDt, err := s.extractTokenMetadata(in.AccessToken)
 	if err != nil {
-		return nil, err
+		es := status.New(codes.InvalidArgument, err.Error())
+		return nil, es.Err()
 	}
 
 	if _, err := s.redis.Get(ctx, tokenDt.AccessUuid); err != nil {
-		return nil, err
+		es := status.New(codes.NotFound, err.Error())
+		return nil, es.Err()
 	}
 
 	return &emptypb.Empty{}, nil
@@ -75,18 +83,21 @@ func (s *Server) RefreshToken(ctx context.Context, in *pb.RefreshTokenReq) (*pb.
 	token, err := jwt.Parse(in.Token, func(token *jwt.Token) (interface{}, error) {
 		// Проверяю соответствие подписи токена с методом SigningMethodHMAC
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			es := status.New(codes.InvalidArgument, fmt.Errorf("unexpected signing method: %v", token.Header["alg"]).Error())
+			return nil, es.Err()
 		}
 
 		return []byte(s.cfg.RefreshSecret), nil
 	})
 	if err != nil {
-		return nil, err
+		es := status.New(codes.InvalidArgument, err.Error())
+		return nil, es.Err()
 	}
 
 	// Проверка валидности токена
 	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
-		return nil, err
+		es := status.New(codes.InvalidArgument, err.Error())
+		return nil, es.Err()
 	}
 
 	// Проверка на соответствие с MapClaims
@@ -94,7 +105,8 @@ func (s *Server) RefreshToken(ctx context.Context, in *pb.RefreshTokenReq) (*pb.
 	if ok && token.Valid {
 		// Удаляю предыдущий refresh токен
 		if err := s.redis.Delete(ctx, claims["refresh_uuid"].(string)); err != nil {
-			return nil, errors.New("unauthorized")
+			es := status.New(codes.InvalidArgument, errors.New("unauthorized").Error())
+			return nil, es.Err()
 		}
 
 		u := pbu.User{
@@ -106,12 +118,14 @@ func (s *Server) RefreshToken(ctx context.Context, in *pb.RefreshTokenReq) (*pb.
 		// Создание новой пары токенов
 		td, err := s.createToken(&u)
 		if err != nil {
-			return nil, err
+			es := status.New(codes.Internal, err.Error())
+			return nil, es.Err()
 		}
 
 		// Сохранение токенов в redis
 		if err := s.createAuth(ctx, td); err != nil {
-			return nil, err
+			es := status.New(codes.Internal, err.Error())
+			return nil, es.Err()
 		}
 
 		return &pb.TokensPair{
@@ -120,14 +134,20 @@ func (s *Server) RefreshToken(ctx context.Context, in *pb.RefreshTokenReq) (*pb.
 		}, nil
 	}
 
-	return nil, errors.New("refresh expired")
+	return nil, status.New(codes.InvalidArgument, errors.New("refresh expired").Error()).Err()
 }
 
 func (s *Server) Logout(ctx context.Context, in *pb.LogoutReq) (*emptypb.Empty, error) {
 	tokenDt, err := s.extractTokenMetadata(in.Token)
 	if err != nil {
-		return nil, err
+		es := status.New(codes.Internal, err.Error())
+		return nil, es.Err()
 	}
 
-	return &emptypb.Empty{}, s.redis.Delete(ctx, tokenDt.AccessUuid)
+	if err := s.redis.Delete(ctx, tokenDt.AccessUuid); err != nil {
+		es := status.New(codes.Internal, err.Error())
+		return nil, es.Err()
+	}
+
+	return &emptypb.Empty{}, nil
 }
