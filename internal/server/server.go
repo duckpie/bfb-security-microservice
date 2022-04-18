@@ -10,6 +10,8 @@ import (
 	"github.com/duckpie/bfb-security-microservice/internal/db/redisstore"
 	pb "github.com/wrs-news/golang-proto/pkg/proto/security"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding"
+	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -55,7 +57,9 @@ func (s *Server) HeartbeatCheck(ctx context.Context, e *emptypb.Empty) (*emptypb
 	return &emptypb.Empty{}, nil
 }
 
-func InitServer(cfg *config.ServerConfig, r redisstore.RedisStoreI) *Server {
+func CreateServer(cfg *config.ServerConfig, r redisstore.RedisStoreI) *Server {
+	encoding.RegisterCompressor(encoding.GetCompressor(gzip.Name))
+
 	return &Server{
 		server: grpc.NewServer(),
 		cfg:    cfg,

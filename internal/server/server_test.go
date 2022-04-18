@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 	}
 
 	lis = bufconn.Listen(bufSize)
-	srv := server.InitServer(&testConfig.Services.Server, redisstore.NewRedisStore(r))
+	srv := server.CreateServer(&testConfig.Services.Server, redisstore.NewRedisStore(r))
 	defer srv.GetServer().Stop()
 
 	if err := srv.AddConnection(cherry.UMS, func() (*grpc.ClientConn, error) {

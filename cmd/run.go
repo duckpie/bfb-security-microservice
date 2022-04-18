@@ -66,7 +66,7 @@ func runner(cfg *config.Config) (err error) {
 		return err
 	}
 
-	srv := server.InitServer(&cfg.Services.Server, redisstore.NewRedisStore(r))
+	srv := server.CreateServer(&cfg.Services.Server, redisstore.NewRedisStore(r))
 
 	if err := srv.AddConnection(cherry.UMS, func() (*grpc.ClientConn, error) {
 		return grpc.Dial(
